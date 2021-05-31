@@ -44,6 +44,7 @@ const (
 	StateFlag        = "state"
 	CacheFlag        = "cache"
 	LazyUmountFlag   = "lazyumount"
+	TimeoutMountFlag = "timeoutmount"
 	DockerEngineAPI  = "dockerapiversion"
 	EnvSambaUser     = "NETSHARE_CIFS_USERNAME"
 	EnvSambaPass     = "NETSHARE_CIFS_PASSWORD"
@@ -147,6 +148,7 @@ func setupFlags() {
 	nfsCacheCmd.Flags().StringP(StateFlag, "F", "/run/nfscache.json", "State file.")
 	nfsCacheCmd.Flags().StringP(CacheFlag, "C", "/tmp", "Credentials cache directory.")
 	nfsCacheCmd.Flags().Bool(LazyUmountFlag, false, "Make the umount as soon as the filesystem is not busy anymore.")
+	nfsCacheCmd.Flags().IntP(TimeoutMountFlag, "t", 40, "Timeout to apply over mount execution")
 
 	efsCmd.Flags().String(AvailZoneFlag, "", "AWS Availability zone [default: \"\", looks up via metadata]")
 	efsCmd.Flags().String(NameServerFlag, "", "Custom DNS nameserver.  [default \"\", uses /etc/resolv.conf]")
@@ -222,6 +224,7 @@ func execNFSCACHE(cmd *cobra.Command, args []string) {
 	stateFile, _ := cmd.Flags().GetString(StateFlag)
 	cacheDir, _ := cmd.Flags().GetString(CacheFlag)
 	lazyUmount, _ := cmd.Flags().GetBool(LazyUmountFlag)
+	timeoutMount, _ := cmd.Flags().GetInt(TimeoutMountFlag)
 	setDockerEnv()
 	if os.Getenv(EnvNfsVers) != "" {
 		if v, err := strconv.Atoi(os.Getenv(EnvNfsVers)); err == nil {
@@ -232,8 +235,8 @@ func execNFSCACHE(cmd *cobra.Command, args []string) {
 	}
 	options, _ := cmd.Flags().GetString(OptionsFlag)
 	mount := syncDockerState("nfs")
-	d := drivers.NewNFSCacheDriver(rootForType(drivers.NFS), version, options, mount, cacheDir, stateFile, lazyUmount)
-	startOutput(fmt.Sprintf("NFS CCache Version %d :: options: '%s', cache: '%s', state: '%s', lazy umount: %v", version, options, cacheDir, stateFile, lazyUmount))
+	d := drivers.NewNFSCacheDriver(rootForType(drivers.NFS), version, options, mount, cacheDir, stateFile, lazyUmount, timeoutMount)
+	startOutput(fmt.Sprintf("NFS CCache Version %d :: options: '%s', cache: '%s', state: '%s', lazy umount: %v, Timeout mount: %d", version, options, cacheDir, stateFile, lazyUmount, timeoutMount))
 	start(drivers.NFS, d)
 }
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.38
+
+* [nfscache] Added timeout to mount command. Default value 40 seconds. To define custom seconds "-t \d+"
+
 ## 0.37
 
 * Add NFSCACHE driver
