@@ -17,17 +17,19 @@ const (
 
 type nfsCacheDriver struct {
 	cacheDriver
-	version int
-	nfsopts map[string]string
-	lazyUmount bool
+	version      int
+	nfsopts      map[string]string
+	lazyUmount   bool
+	timeoutMount int
 }
 
-func NewNFSCacheDriver(root string, version int, nfsopts string, mounts *MountManager, path string, state string, lazyUmount bool) nfsCacheDriver {
+func NewNFSCacheDriver(root string, version int, nfsopts string, mounts *MountManager, path string, state string, lazyUmount bool, timeoutMount int) nfsCacheDriver {
 	d := nfsCacheDriver{
-		cacheDriver: newCacheDriver(root, mounts, path, state),
-		version:     version,
-		nfsopts:     map[string]string{},
-		lazyUmount:  lazyUmount,
+		cacheDriver:  newCacheDriver(root, mounts, path, state),
+		version:      version,
+		nfsopts:      map[string]string{},
+		lazyUmount:   lazyUmount,
+		timeoutMount: timeoutMount,
 	}
 
 	if len(nfsopts) > 0 {
@@ -93,7 +95,7 @@ func (n nfsCacheDriver) Mount(r *volume.MountRequest) (*volume.MountResponse, er
 
 		n.mountm.Add(resolvedName, hostdir)
 
-		if err := n.mountVolume(resolvedName, source, hostdir, n.version); err != nil {
+		if err := n.mountVolume(resolvedName, source, hostdir, n.version, n.timeoutMount); err != nil {
 			n.mountm.Decrement(resolvedName)
 			return nil, err
 		}
@@ -168,7 +170,7 @@ func (n nfsCacheDriver) fixSource(name string) string {
 	return addShareColon(name)
 }
 
-func (n nfsCacheDriver) mountVolume(name, source, dest string, version int) error {
+func (n nfsCacheDriver) mountVolume(name, source, dest string, version int, timeoutMount int) error {
 	var cmd string
 
 	options := merge(n.mountm.GetOptions(name), n.nfsopts)
@@ -178,6 +180,7 @@ func (n nfsCacheDriver) mountVolume(name, source, dest string, version int) erro
 	}
 
 	mountCmd := "mount"
+	timeoutCmd := fmt.Sprintf("timeout %d", timeoutMount)
 
 	if log.GetLevel() == log.DebugLevel {
 		mountCmd = mountCmd + " -v"
@@ -189,13 +192,13 @@ func (n nfsCacheDriver) mountVolume(name, source, dest string, version int) erro
 		if len(opts) < 1 {
 			opts = DefaultNfsCacheV3
 		}
-		cmd = fmt.Sprintf("%s -t nfs -o %s %s %s", mountCmd, opts, source, dest)
+		cmd = fmt.Sprintf("%s %s -t nfs -o %s %s %s", timeoutCmd, mountCmd, opts, source, dest)
 	default:
 		log.Debugf("Mounting with NFSv4 - src: %s, dest: %s", source, dest)
 		if len(opts) > 0 {
-			cmd = fmt.Sprintf("%s -t nfs4 -o %s %s %s", mountCmd, opts, source, dest)
+			cmd = fmt.Sprintf("%s %s -t nfs4 -o %s %s %s", timeoutCmd, mountCmd, opts, source, dest)
 		} else {
-			cmd = fmt.Sprintf("%s -t nfs4 %s %s", mountCmd, source, dest)
+			cmd = fmt.Sprintf("%s %s -t nfs4 %s %s", timeoutCmd, mountCmd, source, dest)
 		}
 	}
 	log.Debugf("exec: %s\n", cmd)
